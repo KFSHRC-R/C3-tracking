@@ -188,6 +188,7 @@
   // The Google Apps Script web app that writes each submission to the C3 tracking sheet.
   // Paste the Web app URL (it ends in /exec) between the quotes.
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxHxDjyQcMAnRUW6RBjwjImZUryD7Eu_-xChPaauQjZlQGOqitVwoJ_DQjWaCC8U5rxXA/exec";
+  const SHEET_URL = "https://docs.google.com/spreadsheets/d/1V39ae7Ep--FYlEPv7OkYhbO4qXurvh14Zhxid5RyRIE/edit";
 
   const $ = (id) => document.getElementById(id);
   const form = $('trackingForm');
@@ -260,9 +261,17 @@
     return ok;
   }
 
-  function showToast(message) {
+  function showToast(message, linkUrl) {
     const t = $('toast');
     t.textContent = message;
+    if (message && linkUrl) {
+      t.appendChild(document.createElement('br'));
+      const a = document.createElement('a');
+      a.href = linkUrl; a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = 'Open the tracking sheet';
+      a.style.color = 'inherit'; a.style.fontWeight = '700';
+      t.appendChild(a);
+    }
     t.hidden = !message;
   }
 
@@ -306,20 +315,21 @@
         form.hidden = true;
         $('done').hidden = false;
       } else {
-        let msg = 'Not saved: ' + ((data && data.message) || 'unexpected reply from the server') + ' Please try again.';
-        if (!data) {
-          // Show what actually came back, so a failure can be diagnosed
+        if (data) {
+          showToast('Not saved: ' + (data.message || 'the server reported an error') + ' Please try again.');
+        } else {
+          // The reply could not be read. The entry may still have been saved, so do not tell people it was not.
           let host = '';
           try { host = new URL(res.url).host; } catch (_) {}
           const text = raw.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ')
                           .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
-          msg += ' (Details: HTTP ' + res.status + (host ? ' from ' + host : '') + (text ? ': ' + text : ', empty reply') + ')';
           console.log('C3 tracker: unexpected reply', res.status, res.url, raw.slice(0, 500));
+          showToast('We could not confirm the save. It may still have been saved, so check the tracking sheet before submitting again. (Details: HTTP ' + res.status + (host ? ' from ' + host : '') + (text ? ': ' + text : ', empty reply') + ')', SHEET_URL);
         }
-        showToast(msg);
       }
     } catch (err) {
-      showToast('Could not reach the server. Check your connection and try again.');
+      console.log('C3 tracker: request failed', err);
+      showToast('We could not confirm the save (' + (err && err.message ? err.message : 'network problem') + '). It may still have been saved, so check the tracking sheet before submitting again.', SHEET_URL);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Submit';
