@@ -306,7 +306,17 @@
         form.hidden = true;
         $('done').hidden = false;
       } else {
-        showToast('Not saved: ' + ((data && data.message) || 'unexpected reply from the server') + ' Please try again.');
+        let msg = 'Not saved: ' + ((data && data.message) || 'unexpected reply from the server') + ' Please try again.';
+        if (!data) {
+          // Show what actually came back, so a failure can be diagnosed
+          let host = '';
+          try { host = new URL(res.url).host; } catch (_) {}
+          const text = raw.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ')
+                          .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+          msg += ' (Details: HTTP ' + res.status + (host ? ' from ' + host : '') + (text ? ': ' + text : ', empty reply') + ')';
+          console.log('C3 tracker: unexpected reply', res.status, res.url, raw.slice(0, 500));
+        }
+        showToast(msg);
       }
     } catch (err) {
       showToast('Could not reach the server. Check your connection and try again.');
