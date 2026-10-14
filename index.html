@@ -32,6 +32,34 @@
     .titlebar h1 { margin: 0; font-size: 27px; line-height: 1.15; font-weight: 700; letter-spacing: -.01em; color: #fff; }
     .titlebar p { margin: 8px auto 0; max-width: 340px; font-size: 15px; line-height: 1.45; font-weight: 500; color: #CFE3D8; }
 
+    .titlebar-actions { display: flex; justify-content: flex-end; margin: -8px -12px 8px 0; }
+    .sheet-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      min-height: 44px; padding: 0 16px; border-radius: 999px;
+      border: 1.5px solid rgba(255,255,255,.65); background: rgba(255,255,255,.12);
+      color: #fff; text-decoration: none;
+      font: 600 14px/1 'Figtree', system-ui, sans-serif;
+      transition: background .15s;
+    }
+    .sheet-btn:hover { background: rgba(255,255,255,.24); }
+    .sheet-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+    .modebar {
+      position: relative; display: flex; justify-content: center; gap: 10px;
+      padding: 14px 24px; background: #F1F6F3; border-bottom: 1px solid #D9E4DD;
+    }
+    .modebar input { position: absolute; opacity: 0; pointer-events: none; }
+    .modebar label {
+      display: flex; align-items: center; justify-content: center;
+      min-width: 136px; min-height: 48px; padding: 0 18px;
+      border: 2px solid #0E6B43; border-radius: 12px; background: #fff; color: #0E6B43;
+      font: 700 16px/1 'Figtree', system-ui, sans-serif; cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .modebar label:hover { background: #EAF5EE; }
+    .modebar input:checked + label { background: #0E6B43; color: #fff; }
+    .modebar input:focus-visible + label { outline: 3px solid #0E6B43; outline-offset: 2px; }
+
     form { padding: 26px 24px 8px; display: flex; flex-direction: column; gap: 24px; }
     label.lbl, legend {
       display: block; padding: 0; margin: 0 0 8px;
@@ -115,8 +143,19 @@
     </div>
 
     <div class="titlebar">
+      <div class="titlebar-actions">
+        <a class="sheet-btn" href="https://docs.google.com/spreadsheets/d/1V39ae7Ep--FYlEPv7OkYhbO4qXurvh14Zhxid5RyRIE/edit" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="10" x2="9" y2="20"/></svg>
+          Entries sheet
+        </a>
+      </div>
       <h1>C3 Patient File Tracker</h1>
-      <p>Log a patient file when a patient is discharged, deceased or transferred out.</p>
+      <p>Log a patient file when a patient is admitted, discharged, deceased or transferred out.</p>
+    </div>
+
+    <div class="modebar" id="modebar" role="radiogroup" aria-label="Admission or discharge">
+      <input type="radio" name="entryType" id="type-admission" value="Admission"><label for="type-admission">Admission</label>
+      <input type="radio" name="entryType" id="type-discharge" value="Discharge" checked><label for="type-discharge">Discharge</label>
     </div>
 
     <form id="trackingForm" novalidate>
@@ -139,11 +178,7 @@
 
       <fieldset>
         <legend>Transaction</legend>
-        <div class="seg-grid cols-3" id="txGrid">
-          <input type="radio" name="transaction" id="tx-discharge" value="Discharge"><label for="tx-discharge">Discharge</label>
-          <input type="radio" name="transaction" id="tx-deceased" value="Deceased"><label for="tx-deceased">Deceased</label>
-          <input type="radio" name="transaction" id="tx-transfer" value="Transfer Out"><label for="tx-transfer">Transfer Out</label>
-        </div>
+        <div class="seg-grid cols-3" id="txGrid"></div>
         <p class="err" id="txErr" hidden></p>
       </fieldset>
 
@@ -180,7 +215,7 @@
       </div>
     </div>
 
-    <p class="foot">All fields are required.<br><span style="font-size:12px;opacity:.75">Version 2026-10-07a</span></p>
+    <p class="foot">All fields are required.<br><span style="font-size:12px;opacity:.75">Version 2026-10-14a</span></p>
   </main>
 </div>
 
@@ -201,6 +236,37 @@
     opt.textContent = String(n);
     $('room').appendChild(opt);
   }
+
+  // Transaction choices depend on the Admission / Discharge bar
+  const TRANSACTION_OPTIONS = {
+    Discharge: ['Discharge', 'Deceased', 'Transfer Out'],
+    Admission: ['Elective', 'DSU', 'ICU', 'HDU/TCU', 'Other Unit', 'EMS']
+  };
+
+  function currentType() {
+    const r = document.querySelector('input[name="entryType"]:checked');
+    return r ? r.value : 'Discharge';
+  }
+
+  function renderTransactions(type) {
+    const grid = $('txGrid');
+    grid.textContent = '';
+    TRANSACTION_OPTIONS[type].forEach((label, i) => {
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = 'transaction'; input.id = 'tx-' + i; input.value = label;
+      const lab = document.createElement('label');
+      lab.htmlFor = input.id; lab.textContent = label;
+      grid.appendChild(input);
+      grid.appendChild(lab);
+    });
+    setError('txErr', '', null);
+    grid.classList.remove('bad');
+  }
+
+  renderTransactions(currentType());
+  document.querySelectorAll('input[name="entryType"]').forEach((r) => {
+    r.addEventListener('change', () => renderTransactions(currentType()));
+  });
 
   // Make sure the logo video plays once and holds on its last frame
   const video = $('logoVideo');
@@ -313,6 +379,7 @@
 
       if (data && data.result === 'success') {
         form.hidden = true;
+        $('modebar').hidden = true;
         $('done').hidden = false;
       } else {
         if (data) {
@@ -346,6 +413,8 @@
     showToast('');
     $('done').hidden = true;
     form.hidden = false;
+    $('modebar').hidden = false;
+    renderTransactions(currentType());
     $('room').focus();
   });
 </script>
