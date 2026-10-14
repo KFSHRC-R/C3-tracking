@@ -215,7 +215,7 @@
       </div>
     </div>
 
-    <p class="foot">All fields are required.<br><span style="font-size:12px;opacity:.75">Version 2026-10-14b</span></p>
+    <p class="foot">All fields are required.<br><span style="font-size:12px;opacity:.75">Version 2026-10-14c</span></p>
   </main>
 </div>
 
@@ -268,11 +268,36 @@
     r.addEventListener('change', () => renderTransactions(currentType()));
   });
 
-  // Make sure the logo video plays once and holds on its last frame
+  // The logo plays when the page opens and then again every 10 seconds.
+  // It holds the last frame between plays. Anyone whose device asks for reduced motion sees it once.
+  const LOGO_PERIOD_MS = 10000;
+  function repeatLogo(video, periodMs) {
+    const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let timer = null;
+    function replay() {
+      timer = null;
+      if (document.hidden) return;           // not while the page is in the background
+      video.currentTime = 0;
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+    }
+    video.addEventListener('ended', () => {
+      if (reduceMotion) return;
+      const wait = Math.max(500, periodMs - (video.duration || 0) * 1000);
+      clearTimeout(timer);
+      timer = setTimeout(replay, wait);
+    });
+    // Back on the page after being away: play again straight away
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && video.ended && timer === null && !reduceMotion) replay();
+    });
+  }
+
   const video = $('logoVideo');
   video.muted = true;
   const tryPlay = video.play();
   if (tryPlay && tryPlay.catch) tryPlay.catch(() => {});
+  repeatLogo(video, LOGO_PERIOD_MS);
 
   function setError(id, message, controlEl) {
     const el = $(id);
